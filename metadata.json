@@ -1,0 +1,6 @@
+{
+  "name": "网球对战",
+  "description": "支持手机端流畅触控与电脑AI对战的H5网球小游戏，具备专业计分系统，适配微信小程序嵌入。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
