@@ -1,38 +1,48 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 
 interface SteeringHelmProps {
-  onSteer: (value: number) => void; // -1 (left) to +1 (right), 0 (neutral)
+  onSteer: (x: number, y: number) => void; // -1 to 1 for both axes: x (left/right), y (up/down)
   className?: string;
 }
 
 export const SteeringHelm: React.FC<SteeringHelmProps> = ({ onSteer, className = '' }) => {
-  const trackRef = useRef<HTMLDivElement | null>(null);
-  const [offset, setOffset] = useState<number>(0); // -1 to 1
+  const padRef = useRef<HTMLDivElement | null>(null);
+  const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 }); // -1 to 1
   const [isActive, setIsActive] = useState<boolean>(false);
   const activePointerId = useRef<number | null>(null);
   const animFrameRef = useRef<number | null>(null);
-  const targetOffsetRef = useRef<number>(0);
 
-  // Update offset with smooth damping
+  // Maximum radius in pixels for knob displacement from center
+  const MAX_RADIUS = 36;
+
   const updatePosition = useCallback(
-    (clientX: number) => {
-      if (!trackRef.current) return;
-      const rect = trackRef.current.getBoundingClientRect();
+    (clientX: number, clientY: number) => {
+      if (!padRef.current) return;
+      const rect = padRef.current.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
-      const halfWidth = (rect.width - 44) / 2; // Subtract knob size
+      const centerY = rect.top + rect.height / 2;
 
-      const rawDelta = clientX - centerX;
-      const clampedDelta = Math.max(-halfWidth, Math.min(halfWidth, rawDelta));
-      const normalized = clampedDelta / halfWidth; // -1 to +1
+      const rawDx = clientX - centerX;
+      const rawDy = clientY - centerY;
+      const dist = Math.hypot(rawDx, rawDy);
 
-      // Responsive steering curve: slight thumb nudges provide strong, agile lateral movement
-      const sign = Math.sign(normalized);
-      const absVal = Math.abs(normalized);
-      const responsiveValue = sign * Math.min(1, Math.pow(absVal, 0.85) * 1.15);
+      let clampedDx = rawDx;
+      let clampedDy = rawDy;
 
-      setOffset(normalized);
-      targetOffsetRef.current = normalized;
-      onSteer(responsiveValue);
+      if (dist > MAX_RADIUS) {
+        clampedDx = (rawDx / dist) * MAX_RADIUS;
+        clampedDy = (rawDy / dist) * MAX_RADIUS;
+      }
+
+      const normX = clampedDx / MAX_RADIUS; // -1 to +1
+      const normY = clampedDy / MAX_RADIUS; // -1 to +1
+
+      // Responsive steering curves for agile court repositioning
+      const respX = Math.sign(normX) * Math.min(1, Math.pow(Math.abs(normX), 0.85) * 1.12);
+      const respY = Math.sign(normY) * Math.min(1, Math.pow(Math.abs(normY), 0.85) * 1.12);
+
+      setOffset({ x: normX, y: normY });
+      onSteer(respX, respY);
     },
     [onSteer]
   );
@@ -47,14 +57,14 @@ export const SteeringHelm: React.FC<SteeringHelmProps> = ({ onSteer, className =
     } catch {
       // ignore
     }
-    updatePosition(e.clientX);
+    updatePosition(e.clientX, e.clientY);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isActive || activePointerId.current !== e.pointerId) return;
     e.preventDefault();
     e.stopPropagation();
-    updatePosition(e.clientX);
+    updatePosition(e.clientX, e.clientY);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -64,19 +74,23 @@ export const SteeringHelm: React.FC<SteeringHelmProps> = ({ onSteer, className =
     setIsActive(false);
     activePointerId.current = null;
 
-    // Smooth return to center with prompt braking
+    // Smooth return to center with prompt responsive braking
     const returnToCenter = () => {
       setOffset((prev) => {
-        if (Math.abs(prev) < 0.08) {
-          onSteer(0);
-          return 0;
+        const nextX = Math.abs(prev.x) < 0.08 ? 0 : prev.x * 0.45;
+        const nextY = Math.abs(prev.y) < 0.08 ? 0 : prev.y * 0.45;
+
+        if (nextX === 0 && nextY === 0) {
+          onSteer(0, 0);
+          return { x: 0, y: 0 };
         }
-        const next = prev * 0.45;
-        onSteer(next);
+
+        onSteer(nextX, nextY);
         animFrameRef.current = requestAnimationFrame(returnToCenter);
-        return next;
+        return { x: nextX, y: nextY };
       });
     };
+
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     animFrameRef.current = requestAnimationFrame(returnToCenter);
   };
@@ -87,55 +101,95 @@ export const SteeringHelm: React.FC<SteeringHelmProps> = ({ onSteer, className =
     };
   }, []);
 
+  // Direction active states based on current offset
+  const isUpActive = offset.y < -0.22;
+  const isDownActive = offset.y > 0.22;
+  const isLeftActive = offset.x < -0.22;
+  const isRightActive = offset.x > 0.22;
+
   return (
     <div
       id="tennis-steering-helm"
-      ref={trackRef}
+      ref={padRef}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      className={`relative select-none touch-none h-13 w-48 md:w-56 rounded-full bg-slate-900/35 backdrop-blur-[3px] border border-white/20 shadow-lg flex items-center justify-between px-3 cursor-ew-resize transition-all duration-150 ${
-        isActive ? 'border-cyan-400/60 bg-slate-900/50 shadow-cyan-500/15' : 'hover:bg-slate-900/40'
+      className={`relative select-none touch-none w-28 h-28 md:w-32 md:h-32 rounded-full bg-slate-900/40 backdrop-blur-[4px] border-2 shadow-2xl flex items-center justify-center transition-colors duration-150 cursor-grab active:cursor-grabbing ${
+        isActive
+          ? 'border-cyan-400/80 bg-slate-900/60 shadow-cyan-500/20'
+          : 'border-white/20 hover:border-white/35 hover:bg-slate-900/50'
       } ${className}`}
-      title="左右移动舵 (左右拖拽或滑动控制角色)"
+      title="上下左右方向舵 (全向拖拽控制球员走位)"
     >
-      {/* Left Steering Indicator */}
+      {/* Directional Guides / Crosshairs in background */}
+      <div className="absolute inset-x-3 top-1/2 -translate-y-1/2 h-[1px] bg-white/10 pointer-events-none" />
+      <div className="absolute inset-y-3 left-1/2 -translate-x-1/2 w-[1px] bg-white/10 pointer-events-none" />
+      <div className="absolute inset-4 rounded-full border border-white/5 pointer-events-none" />
+
+      {/* UP Arrow ▲ */}
       <div
-        className={`flex items-center gap-1 text-xs font-bold transition-colors pointer-events-none ${
-          offset < -0.2 ? 'text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'text-slate-400/70'
+        id="helm-arrow-up"
+        className={`absolute top-1.5 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none transition-all duration-100 ${
+          isUpActive
+            ? 'text-cyan-300 scale-125 drop-shadow-[0_0_10px_rgba(34,211,238,0.9)]'
+            : 'text-slate-400/60'
         }`}
       >
-        <span className="text-sm">◀</span>
-        <span className="text-[11px] tracking-wider">左移</span>
+        <span className="text-base md:text-lg leading-none select-none">▲</span>
       </div>
 
-      {/* Center Neutral Notch */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-4 bg-white/25 rounded-full pointer-events-none" />
-
-      {/* Right Steering Indicator */}
+      {/* DOWN Arrow ▼ */}
       <div
-        className={`flex items-center gap-1 text-xs font-bold transition-colors pointer-events-none ${
-          offset > 0.2 ? 'text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'text-slate-400/70'
+        id="helm-arrow-down"
+        className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none transition-all duration-100 ${
+          isDownActive
+            ? 'text-cyan-300 scale-125 drop-shadow-[0_0_10px_rgba(34,211,238,0.9)]'
+            : 'text-slate-400/60'
         }`}
       >
-        <span className="text-[11px] tracking-wider">右移</span>
-        <span className="text-sm">▶</span>
+        <span className="text-base md:text-lg leading-none select-none">▼</span>
       </div>
 
-      {/* Draggable Steering Knob / Rudder Dial */}
+      {/* LEFT Arrow ◀ */}
+      <div
+        id="helm-arrow-left"
+        className={`absolute left-1.5 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none transition-all duration-100 ${
+          isLeftActive
+            ? 'text-cyan-300 scale-125 drop-shadow-[0_0_10px_rgba(34,211,238,0.9)]'
+            : 'text-slate-400/60'
+        }`}
+      >
+        <span className="text-base md:text-lg leading-none select-none">◀</span>
+      </div>
+
+      {/* RIGHT Arrow ▶ */}
+      <div
+        id="helm-arrow-right"
+        className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none transition-all duration-100 ${
+          isRightActive
+            ? 'text-cyan-300 scale-125 drop-shadow-[0_0_10px_rgba(34,211,238,0.9)]'
+            : 'text-slate-400/60'
+        }`}
+      >
+        <span className="text-base md:text-lg leading-none select-none">▶</span>
+      </div>
+
+      {/* Center Draggable Knob / Rudder Hub */}
       <div
         id="tennis-steering-knob"
-        className="absolute top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gradient-to-b from-slate-700/90 to-slate-900/90 border-2 border-cyan-400/80 shadow-md shadow-cyan-500/20 flex items-center justify-center pointer-events-none transition-transform"
+        className="absolute w-11 h-11 rounded-full bg-gradient-to-b from-slate-700/95 to-slate-900/95 border-2 border-cyan-400 shadow-md shadow-cyan-500/25 flex items-center justify-center pointer-events-none will-change-transform"
         style={{
-          left: `calc(50% + ${offset * 38}% - 20px)`,
+          transform: `translate(${offset.x * MAX_RADIUS}px, ${offset.y * MAX_RADIUS}px)`,
         }}
       >
-        {/* Grip ridges / Rudder icon */}
+        {/* Core Jewel / Gripping Ring */}
         <div className="w-5 h-5 rounded-full border border-cyan-300/40 flex items-center justify-center">
           <div
-            className={`w-2.5 h-2.5 rounded-full transition-colors ${
-              isActive ? 'bg-cyan-400 shadow-[0_0_6px_#22d3ee]' : 'bg-cyan-300/80'
+            className={`w-2.5 h-2.5 rounded-full transition-all duration-150 ${
+              isActive
+                ? 'bg-cyan-400 shadow-[0_0_8px_#22d3ee] scale-110'
+                : 'bg-cyan-300/80'
             }`}
           />
         </div>

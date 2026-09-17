@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Sharp clean path for the D mark -->
+  </defs>
+  <!-- Background with slight rounding -->
+  <rect width="512" height="512" rx="40" fill="#24301b" />
+
+  <g id="logo-mark">
+    <!-- Big Stylized 'D' Icon with inner cutout -->
+    <path
+      d="M 190 95 
+         L 282 95 
+         C 342 95, 388 138, 388 202 
+         C 388 266, 342 305, 275 305 
+         L 138 305 
+         Z 
+         M 216 142 
+         L 182 258 
+         L 262 258 
+         C 305 258, 336 235, 336 200 
+         C 336 165, 305 142, 262 142 
+         Z"
+      fill="#d2eca0"
+      fill-rule="evenodd"
+    />
+
+    <!-- Tennis Ball Icon at lower-right of the 'D' -->
+    <g transform="translate(365, 305) rotate(-18)">
+      <!-- Ball base outline -->
+      <ellipse cx="0" cy="0" rx="26" ry="18" fill="#24301b" stroke="#d2eca0" stroke-width="4.2" />
+      <!-- Tennis ball seams -->
+      <path
+        d="M -16 -13 C -6 -6, -6 6, -16 13"
+        fill="none"
+        stroke="#d2eca0"
+        stroke-width="3.5"
+        stroke-linecap="round"
+      />
+      <path
+        d="M 16 -13 C 6 -6, 6 6, 16 13"
+        fill="none"
+        stroke="#d2eca0"
+        stroke-width="3.5"
+        stroke-linecap="round"
+      />
+    </g>
+
+    <!-- Bottom Typography: DONG [动] -->
+    <g transform="translate(256, 400)">
+      <text
+        x="0"
+        y="0"
+        text-anchor="middle"
+        dominant-baseline="central"
+        fill="#d2eca0"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif"
+        font-weight="900"
+        font-size="44"
+        letter-spacing="5"
+      >DONG [动]</text>
+    </g>
+  </g>
+</svg>

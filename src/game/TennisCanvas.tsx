@@ -29,6 +29,7 @@ import {
 import { SteeringHelm } from '../components/SteeringHelm';
 import { ActionSwingButton } from '../components/ActionSwingButton';
 import { TechniqueDisplayBanner } from '../components/TechniqueDisplayBanner';
+import { renderCourtGroundLogo } from './courtLogo';
 
 interface TennisCanvasProps {
   surface: CourtSurface;
@@ -130,7 +131,7 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
   const canvasFloatingTextsRef = useRef<CanvasFloatingText[]>([]);
 
   // Input states
-  const helmInput = useRef<number>(0); // -1.0 (left) to +1.0 (right) from steering helm
+  const helmInput = useRef<{ x: number; y: number }>({ x: 0, y: 0 }); // Full 2D direction (x: left/right, y: up/down)
   const keysPressed = useRef<{ [key: string]: boolean }>({});
   const touchJoystick = useRef<{ active: boolean; startX: number; startY: number; curX: number; curY: number }>({
     active: false,
@@ -703,9 +704,12 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
         if (keysPressed.current['ArrowUp'] || keysPressed.current['KeyW']) moveY -= 1;
         if (keysPressed.current['ArrowDown'] || keysPressed.current['KeyS']) moveY += 1;
 
-        // Steering helm input (semi-transparent left rudder)
-        if (Math.abs(helmInput.current) > 0.02) {
-          moveX += helmInput.current;
+        // Steering helm input (semi-transparent omnidirectional rudder)
+        if (Math.abs(helmInput.current.x) > 0.02) {
+          moveX += helmInput.current.x;
+        }
+        if (Math.abs(helmInput.current.y) > 0.02) {
+          moveY += helmInput.current.y;
         }
 
         // Virtual joystick input (fallback if touch drag occurs)
@@ -1124,7 +1128,7 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
     ctx.font = `bold ${Math.max(10, Math.min(13, h * 0.016))}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🏆 GRAND SLAM TENNIS CHAMPIONSHIP', w / 2, bannerY + bannerH / 2);
+    ctx.fillText('🏆 DONG [动] GRAND SLAM CHAMPIONSHIP', w / 2, bannerY + bannerH / 2);
   };
 
   const renderCourt = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
@@ -1220,6 +1224,19 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
 
     // Center Service Line (connects both service lines through net at x = 0)
     drawLine(0, -SERVICE_LINE_DIST, 0, SERVICE_LINE_DIST);
+
+    // --- On-Court Sponsor Advertisement (DONG [动]) ---
+    // Placed in the left service box, moved down away from the net, completely clear of all court lines
+    renderCourtGroundLogo(
+      ctx,
+      projectPoint,
+      -2.05,
+      3.15,
+      w,
+      h,
+      0.50,
+      0.95
+    );
 
     // Center Marks at baselines
     drawLine(0, -COURT_HALF_LENGTH, 0, -COURT_HALF_LENGTH + 0.5);
@@ -1570,14 +1587,14 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
       {/* Virtual Joystick Mode: Show Bottom On-Screen Controls */}
       {controlMode === 'joystick' && (
         <>
-          {/* Mobile Steering Helm for Lateral Left/Right Movement (Left Side, Semi-Transparent) */}
+          {/* Mobile Steering Helm for Up/Down/Left/Right Movement (Left Side, Semi-Transparent) */}
           <div
             id="tennis-mobile-helm-container"
             className="absolute bottom-5 left-4 md:bottom-6 md:left-6 z-20 pointer-events-auto"
           >
             <SteeringHelm
-              onSteer={(val) => {
-                helmInput.current = val;
+              onSteer={(x, y) => {
+                helmInput.current = { x, y };
               }}
             />
           </div>

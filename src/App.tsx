@@ -35,7 +35,7 @@ const INITIAL_STATS: MatchStats = {
 };
 
 export default function App() {
-  const [surface, setSurface] = useState<CourtSurface>('hard');
+  const [surface, setSurface] = useState<CourtSurface>('clay');
   const [difficulty, setDifficulty] = useState<GameDifficulty>('medium');
   const [controlMode, setControlMode] = useState<ControlMode>('joystick');
   const [isPaused, setIsPaused] = useState<boolean>(false);
