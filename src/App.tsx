@@ -6,7 +6,6 @@
 import React, { useState, useCallback } from 'react';
 import { GameControls } from './components/GameControls';
 import { MatchOverModal } from './components/MatchOverModal';
-import { MiniProgramTip } from './components/MiniProgramTip';
 import { ScoreBoard } from './components/ScoreBoard';
 import { TennisCanvas } from './game/TennisCanvas';
 import { ControlMode, CourtSurface, GameDifficulty, MatchStats, ScoreState } from './types';
@@ -38,12 +37,11 @@ const INITIAL_STATS: MatchStats = {
 export default function App() {
   const [surface, setSurface] = useState<CourtSurface>('hard');
   const [difficulty, setDifficulty] = useState<GameDifficulty>('medium');
-  const [controlMode, setControlMode] = useState<ControlMode>('touch');
+  const [controlMode, setControlMode] = useState<ControlMode>('joystick');
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [score, setScore] = useState<ScoreState>(INITIAL_SCORE);
   const [stats, setStats] = useState<MatchStats>(INITIAL_STATS);
   const [gameOverWinner, setGameOverWinner] = useState<'player' | 'ai' | null>(null);
-  const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
   const [matchKey, setMatchKey] = useState<number>(0);
 
   const handleRestart = useCallback(() => {
@@ -102,7 +100,6 @@ export default function App() {
           onDifficultyChange={setDifficulty}
           controlMode={controlMode}
           onControlModeChange={setControlMode}
-          onOpenHelp={() => setIsHelpOpen(true)}
         />
       </header>
 
@@ -130,12 +127,6 @@ export default function App() {
           onRestart={handleRestart}
         />
       )}
-
-      {/* WeChat Mini Program Embedding Guide Modal */}
-      <MiniProgramTip
-        isOpen={isHelpOpen}
-        onClose={() => setIsHelpOpen(false)}
-      />
     </div>
   );
 }

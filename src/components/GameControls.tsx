@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, Pause, Play, RotateCcw, Smartphone, Settings2, HelpCircle } from 'lucide-react';
+import { Volume2, VolumeX, Pause, Play, RotateCcw, Smartphone, Settings2 } from 'lucide-react';
 import { ControlMode, CourtSurface, GameDifficulty } from '../types';
 import { soundManager } from '../utils/audio';
 
@@ -13,7 +13,7 @@ interface GameControlsProps {
   onDifficultyChange: (diff: GameDifficulty) => void;
   controlMode: ControlMode;
   onControlModeChange: (mode: ControlMode) => void;
-  onOpenHelp: () => void;
+  onOpenHelp?: () => void;
 }
 
 export const GameControls: React.FC<GameControlsProps> = ({
@@ -26,7 +26,6 @@ export const GameControls: React.FC<GameControlsProps> = ({
   onDifficultyChange,
   controlMode,
   onControlModeChange,
-  onOpenHelp,
 }) => {
   const [soundEnabled, setSoundEnabled] = useState(soundManager.isSoundEnabled());
   const [showSettings, setShowSettings] = useState(false);
@@ -79,12 +78,12 @@ export const GameControls: React.FC<GameControlsProps> = ({
           {/* Quick Mode Toggle */}
           <button
             id="btn-toggle-control-mode"
-            onClick={() => onControlModeChange(controlMode === 'touch' ? 'joystick' : 'touch')}
+            onClick={() => onControlModeChange(controlMode === 'joystick' ? 'touch' : 'joystick')}
             className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700/60 shadow transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
             title="切换操控模式"
           >
             <Smartphone size={14} className="text-cyan-400" />
-            <span>{controlMode === 'touch' ? '滑动触控' : '虚拟摇杆'}</span>
+            <span>{controlMode === 'joystick' ? '虚拟摇杆' : '滑动触控'}</span>
           </button>
 
           {/* Settings Modal Toggle */}
@@ -95,16 +94,6 @@ export const GameControls: React.FC<GameControlsProps> = ({
             title="场地与难度设置"
           >
             <Settings2 size={16} className="text-purple-400" />
-          </button>
-
-          {/* WeChat Mini Program / Help Guide */}
-          <button
-            id="btn-open-wechat-guide"
-            onClick={onOpenHelp}
-            className="p-2 rounded-lg bg-emerald-900/60 hover:bg-emerald-800/80 active:scale-95 text-emerald-300 border border-emerald-600/50 shadow transition-colors cursor-pointer"
-            title="微信小程序嵌入指南"
-          >
-            <HelpCircle size={16} />
           </button>
         </div>
       </div>
@@ -177,16 +166,6 @@ export const GameControls: React.FC<GameControlsProps> = ({
               <label className="text-xs text-slate-400 font-semibold mb-1.5 block">移动操作模式</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => onControlModeChange('touch')}
-                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    controlMode === 'touch'
-                      ? 'bg-emerald-600 text-white shadow-lg border border-emerald-400'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
-                  }`}
-                >
-                  手指拖拽跟随 (推荐)
-                </button>
-                <button
                   onClick={() => onControlModeChange('joystick')}
                   className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     controlMode === 'joystick'
@@ -194,7 +173,17 @@ export const GameControls: React.FC<GameControlsProps> = ({
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
                   }`}
                 >
-                  虚拟摇杆按键
+                  虚拟摇杆按键 (推荐)
+                </button>
+                <button
+                  onClick={() => onControlModeChange('touch')}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    controlMode === 'touch'
+                      ? 'bg-emerald-600 text-white shadow-lg border border-emerald-400'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                  }`}
+                >
+                  滑动触控 (隐藏按键)
                 </button>
               </div>
             </div>

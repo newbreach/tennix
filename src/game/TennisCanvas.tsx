@@ -140,6 +140,7 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
     curY: 0,
   });
   const touchAim = useRef<{ targetX: number; targetY: number } | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   // Sync state between referee & render loop
   const scoreRef = useRef(score);
@@ -1442,8 +1443,8 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
     const touchY = touch.clientY - rect.top;
 
     if (controlMode === 'joystick') {
-      // If touch is on bottom-left half, activate joystick
-      if (touchX < rect.width * 0.5) {
+      // If touch is on bottom-left half, activate joystick fallback
+      if (touchX < rect.width * 0.45 && touchY > rect.height * 0.45) {
         touchJoystick.current = {
           active: true,
           startX: touchX,
@@ -1453,12 +1454,14 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
         };
       }
     } else {
-      // Direct touch mode: move player towards touch location
-      touchAim.current = {
-        targetX: ((touchX - rect.width * 0.5) / (rect.width * 0.45)) * COURT_HALF_WIDTH,
-        targetY: COURT_HALF_LENGTH,
-      };
-      // If waiting to serve, tap to serve!
+      // Touch / Swipe Mode: All bottom buttons hidden, screen accepts full swipe gestures
+      touchStartRef.current = { x: touchX, y: touchY, time: performance.now() };
+
+      // Move player towards touch horizontal location
+      const courtX = ((touchX - rect.width * 0.5) / (rect.width * 0.45)) * COURT_HALF_WIDTH;
+      playerRef.current.x = Math.max(-COURT_DOUBLES_HALF_WIDTH - 1.0, Math.min(COURT_DOUBLES_HALF_WIDTH + 1.0, courtX));
+
+      // If waiting to serve, tap to serve immediately!
       if (gameStateRef.current === 'serving' && scoreRef.current.server === 'player') {
         handlePlayerSwingWithDirection('tap');
       }
@@ -1473,19 +1476,57 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
     const touchX = touch.clientX - rect.left;
     const touchY = touch.clientY - rect.top;
 
-    if (controlMode === 'joystick' && touchJoystick.current.active) {
-      touchJoystick.current.curX = touchX;
-      touchJoystick.current.curY = touchY;
+    if (controlMode === 'joystick') {
+      if (touchJoystick.current.active) {
+        touchJoystick.current.curX = touchX;
+        touchJoystick.current.curY = touchY;
+      }
     } else if (controlMode === 'touch') {
-      // Update player position directly from touch
+      // Direct touch mode: move player horizontally with finger
       const courtX = ((touchX - rect.width * 0.5) / (rect.width * 0.45)) * COURT_HALF_WIDTH;
-      playerRef.current.x = Math.max(-COURT_HALF_WIDTH - 1.0, Math.min(COURT_HALF_WIDTH + 1.0, courtX));
+      playerRef.current.x = Math.max(-COURT_DOUBLES_HALF_WIDTH - 1.0, Math.min(COURT_DOUBLES_HALF_WIDTH + 1.0, courtX));
+
+      // If in rally and incoming ball is in sweet spot while sliding to intercept, auto-swing!
+      if (gameStateRef.current === 'rally' && ballRef.current.inPlay && !playerRef.current.isSwinging) {
+        const b = ballRef.current;
+        const p = playerRef.current;
+        const distX = Math.abs(b.x - p.x);
+        const distY = Math.abs(b.y - p.y);
+        if (distX <= 1.8 && distY <= 1.8 && b.z >= 0.2 && b.z <= 2.8 && b.y > 6.0) {
+          handlePlayerSwingWithDirection('tap');
+        }
+      }
     }
   };
 
-  const handleTouchEnd = () => {
-    touchJoystick.current.active = false;
-    touchAim.current = null;
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (controlMode === 'joystick') {
+      touchJoystick.current.active = false;
+      touchAim.current = null;
+    } else if (controlMode === 'touch' && touchStartRef.current) {
+      const touch = e.changedTouches?.[0];
+      if (touch && canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const endX = touch.clientX - rect.left;
+        const endY = touch.clientY - rect.top;
+        const dx = endX - touchStartRef.current.x;
+        const dy = endY - touchStartRef.current.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist >= 25) {
+          // Directional swipe gesture on screen
+          if (Math.abs(dy) > Math.abs(dx)) {
+            handlePlayerSwingWithDirection(dy < 0 ? 'up' : 'down');
+          } else {
+            handlePlayerSwingWithDirection(dx > 0 ? 'right' : 'left');
+          }
+        } else {
+          // Tap: Flat drive
+          handlePlayerSwingWithDirection('tap');
+        }
+      }
+      touchStartRef.current = null;
+    }
   };
 
   return (
@@ -1526,28 +1567,45 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
       {/* Dynamic Technique Execution Display Banner */}
       <TechniqueDisplayBanner technique={activeTechnique} />
 
-      {/* Mobile Steering Helm for Lateral Left/Right Movement (Left Side, Semi-Transparent) */}
-      <div
-        id="tennis-mobile-helm-container"
-        className="absolute bottom-5 left-4 md:bottom-6 md:left-6 z-20 pointer-events-auto"
-      >
-        <SteeringHelm
-          onSteer={(val) => {
-            helmInput.current = val;
-          }}
-        />
-      </div>
+      {/* Virtual Joystick Mode: Show Bottom On-Screen Controls */}
+      {controlMode === 'joystick' && (
+        <>
+          {/* Mobile Steering Helm for Lateral Left/Right Movement (Left Side, Semi-Transparent) */}
+          <div
+            id="tennis-mobile-helm-container"
+            className="absolute bottom-5 left-4 md:bottom-6 md:left-6 z-20 pointer-events-auto"
+          >
+            <SteeringHelm
+              onSteer={(val) => {
+                helmInput.current = val;
+              }}
+            />
+          </div>
 
-      {/* Consolidated Mobile Action Swing Button (Right Side, Tap = Flat, Drag = Directional Techniques) */}
-      <div
-        id="tennis-mobile-action-container"
-        className="absolute bottom-5 right-4 md:bottom-6 md:right-6 z-20 pointer-events-auto"
-      >
-        <ActionSwingButton
-          isServing={gameStateRef.current === 'serving' && score.server === 'player'}
-          onSwing={handlePlayerSwingWithDirection}
-        />
-      </div>
+          {/* Consolidated Mobile Action Swing Button (Right Side, Tap = Flat, Drag = Directional Techniques) */}
+          <div
+            id="tennis-mobile-action-container"
+            className="absolute bottom-5 right-4 md:bottom-6 md:right-6 z-20 pointer-events-auto"
+          >
+            <ActionSwingButton
+              isServing={gameStateRef.current === 'serving' && score.server === 'player'}
+              onSwing={handlePlayerSwingWithDirection}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Touch / Swipe Mode: Minimal unobtrusive gesture hint */}
+      {controlMode === 'touch' && (
+        <div
+          id="tennis-touch-mode-hint"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 pointer-events-none"
+        >
+          <div className="px-3.5 py-1 rounded-full bg-slate-900/60 backdrop-blur-sm border border-slate-700/40 text-slate-300 text-xs font-medium shadow-md">
+            左右滑动移动 · 上下左右划屏击球
+          </div>
+        </div>
+      )}
     </div>
   );
 };
