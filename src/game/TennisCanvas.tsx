@@ -691,7 +691,8 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
       if (!isPaused) {
         // --- 1. UPDATE PLAYER MOVEMENT ---
         const p = playerRef.current;
-        let pSpeed = 6.8;
+        const pSpeedX = 11.6; // Significantly faster lateral speed for quick court coverage
+        const pSpeedY = 7.5;
         let moveX = 0;
         let moveY = 0;
 
@@ -719,8 +720,8 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
 
         const clampedMoveX = Math.max(-1, Math.min(1, moveX));
         if (clampedMoveX !== 0 || moveY !== 0) {
-          p.x += clampedMoveX * pSpeed * dt;
-          p.y += moveY * pSpeed * dt;
+          p.x += clampedMoveX * pSpeedX * dt;
+          p.y += moveY * pSpeedY * dt;
           p.facing = clampedMoveX >= 0 ? 1 : -1;
         }
 
@@ -943,16 +944,16 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
     width: number,
     height: number
   ): { x: number; y: number; scale: number } => {
-    // Camera is positioned at (0, 18, 5.5) looking towards (0, 0, 0)
-    const horizonY = height * 0.28;
-    const groundSpanY = height * 0.68;
+    // Camera is elevated and court is shifted upwards to give ample operational space below
+    const horizonY = height * 0.12;
+    const groundSpanY = height * 0.58;
 
     // Normalizing y from -14 to +14 into 0 to 1 depth
     const depthT = (y + COURT_HALF_LENGTH + 2.5) / (2 * COURT_HALF_LENGTH + 5.0);
     const clampedT = Math.max(0.01, Math.min(1.0, depthT));
 
     // Perspective scale increases as y gets closer to player (bottom)
-    const scale = 0.52 + clampedT * 0.78;
+    const scale = 0.52 + clampedT * 0.76;
 
     const screenX = width * 0.5 + (x * width * 0.058) * scale;
     const screenY = horizonY + clampedT * groundSpanY - z * height * 0.055 * scale;
@@ -969,7 +970,7 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
     ctx.clearRect(0, 0, w, h);
 
     // 1. Stadium background / Sky
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.32);
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.15);
     if (surface === 'grass') {
       skyGrad.addColorStop(0, '#0f2415');
       skyGrad.addColorStop(1, '#1b3f26');
@@ -1096,34 +1097,37 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
   };
 
   const renderStadium = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const horizonY = h * 0.28;
+    const horizonY = h * 0.12;
     // Stadium wall
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, horizonY - h * 0.09, w, h * 0.09);
+    ctx.fillRect(0, Math.max(0, horizonY - h * 0.075), w, h * 0.075);
 
     // Grandstand seats pattern
     ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-    for (let row = 0; row < 5; row++) {
-      ctx.fillRect(0, horizonY - h * 0.09 + row * (h * 0.016), w, h * 0.007);
+    for (let row = 0; row < 3; row++) {
+      ctx.fillRect(0, Math.max(0, horizonY - h * 0.075 + row * (h * 0.018)), w, h * 0.007);
     }
 
     // Center Tournament Banner
-    const bannerW = Math.min(w * 0.55, 380);
+    const bannerW = Math.min(w * 0.65, 340);
     const bannerX = (w - bannerW) / 2;
+    const bannerH = Math.min(24, Math.max(16, h * 0.035));
+    const bannerY = Math.max(4, horizonY - bannerH - 4);
     ctx.fillStyle = '#0f172a';
-    ctx.fillRect(bannerX, horizonY - h * 0.075, bannerW, h * 0.045);
+    ctx.fillRect(bannerX, bannerY, bannerW, bannerH);
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
-    ctx.strokeRect(bannerX, horizonY - h * 0.075, bannerW, h * 0.045);
+    ctx.strokeRect(bannerX, bannerY, bannerW, bannerH);
 
     ctx.fillStyle = '#f8fafc';
-    ctx.font = `bold ${Math.max(12, h * 0.019)}px sans-serif`;
+    ctx.font = `bold ${Math.max(10, Math.min(13, h * 0.016))}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🏆 GRAND SLAM TENNIS CHAMPIONSHIP', w / 2, horizonY - h * 0.052);
+    ctx.fillText('🏆 GRAND SLAM TENNIS CHAMPIONSHIP', w / 2, bannerY + bannerH / 2);
   };
 
   const renderCourt = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const horizonY = h * 0.12;
     // Colors by surface
     let surroundColor = '#1e3a8a';
     let courtColor = '#2563eb';
@@ -1139,11 +1143,26 @@ export const TennisCanvas: React.FC<TennisCanvasProps> = ({
       lineColor = '#f8fafc';
     }
 
+    // Fill entire lower ground from horizon down to bottom of screen with surround ground
+    const groundGrad = ctx.createLinearGradient(0, horizonY, 0, h);
+    if (surface === 'clay') {
+      groundGrad.addColorStop(0, '#264630');
+      groundGrad.addColorStop(1, '#172b1e');
+    } else if (surface === 'grass') {
+      groundGrad.addColorStop(0, '#143818');
+      groundGrad.addColorStop(1, '#0c220e');
+    } else {
+      groundGrad.addColorStop(0, '#1e3a8a');
+      groundGrad.addColorStop(1, '#0f1d45');
+    }
+    ctx.fillStyle = groundGrad;
+    ctx.fillRect(0, horizonY, w, h - horizonY);
+
     // Outer Court Perimeter
-    const p1 = projectPoint(-COURT_DOUBLES_HALF_WIDTH - 1.8, -COURT_HALF_LENGTH - 1.5, 0, w, h);
-    const p2 = projectPoint(COURT_DOUBLES_HALF_WIDTH + 1.8, -COURT_HALF_LENGTH - 1.5, 0, w, h);
-    const p3 = projectPoint(COURT_DOUBLES_HALF_WIDTH + 1.8, COURT_HALF_LENGTH + 2.5, 0, w, h);
-    const p4 = projectPoint(-COURT_DOUBLES_HALF_WIDTH - 1.8, COURT_HALF_LENGTH + 2.5, 0, w, h);
+    const p1 = projectPoint(-COURT_DOUBLES_HALF_WIDTH - 2.0, -COURT_HALF_LENGTH - 1.5, 0, w, h);
+    const p2 = projectPoint(COURT_DOUBLES_HALF_WIDTH + 2.0, -COURT_HALF_LENGTH - 1.5, 0, w, h);
+    const p3 = projectPoint(COURT_DOUBLES_HALF_WIDTH + 2.0, COURT_HALF_LENGTH + 2.8, 0, w, h);
+    const p4 = projectPoint(-COURT_DOUBLES_HALF_WIDTH - 2.0, COURT_HALF_LENGTH + 2.8, 0, w, h);
 
     ctx.fillStyle = surroundColor;
     ctx.beginPath();

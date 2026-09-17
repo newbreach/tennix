@@ -25,9 +25,14 @@ export const SteeringHelm: React.FC<SteeringHelmProps> = ({ onSteer, className =
       const clampedDelta = Math.max(-halfWidth, Math.min(halfWidth, rawDelta));
       const normalized = clampedDelta / halfWidth; // -1 to +1
 
+      // Responsive steering curve: slight thumb nudges provide strong, agile lateral movement
+      const sign = Math.sign(normalized);
+      const absVal = Math.abs(normalized);
+      const responsiveValue = sign * Math.min(1, Math.pow(absVal, 0.85) * 1.15);
+
       setOffset(normalized);
       targetOffsetRef.current = normalized;
-      onSteer(normalized);
+      onSteer(responsiveValue);
     },
     [onSteer]
   );
@@ -59,14 +64,14 @@ export const SteeringHelm: React.FC<SteeringHelmProps> = ({ onSteer, className =
     setIsActive(false);
     activePointerId.current = null;
 
-    // Smooth return to center
+    // Smooth return to center with prompt braking
     const returnToCenter = () => {
       setOffset((prev) => {
-        if (Math.abs(prev) < 0.05) {
+        if (Math.abs(prev) < 0.08) {
           onSteer(0);
           return 0;
         }
-        const next = prev * 0.7;
+        const next = prev * 0.45;
         onSteer(next);
         animFrameRef.current = requestAnimationFrame(returnToCenter);
         return next;
